@@ -5,7 +5,7 @@
 2)Numpy Practice: NUMPY-20201013 \
 3)Pandas Practice: PANDAS-20201013 \
 4)Time Series Analysis: SIMS-20201013 \
-Mackey-Glass chaotic time series \
+* Mackey-Glass chaotic time series \
 5)Scikit-Learn Practice: SKLEARN-20201014 \
 
 ## IT Refresh
