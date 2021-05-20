@@ -2,7 +2,7 @@
 Exam and projects during MSc in Data Science at Data ScienceTech Institute
 
 ## Python Refresh
-
+・[Time Series](Time-Series.pdf)
 
 ## IT Refresh
 IT Refresh 
