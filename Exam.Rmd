@@ -1,0 +1,420 @@
+---
+title: "ASML Exam"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+#library(TSstudio)
+library(tidyverse)
+library(glmnet)
+library(ggpubr)
+library(rstatix)
+library(broom)
+library(PerformanceAnalytics)
+library(olsrr)
+library(caret)
+library(ranger)
+library(plotly)
+library(pls)
+library(randomForest)
+library(DataExplorer)
+library(lightgbm)
+library(superml)
+```
+
+
+# *Analysis of Development*
+```{r}
+df_development<-read.csv("data1.csv", sep=";")
+head(df_development)
+```
+
+df_development(data1) have 1 discrete and 3 continuous variables with 12 observations.
+There is no missing value in this dataset
+```{r}
+introduce(df_development)
+```
+
+Quantitative visualization oof the basic information about the dataset
+```{r}
+plot_intro(df_development)
+plot_missing(df_development)
+```
+Check the distribution of the variable in this dataset.
+As we have only 12 observations, the concrete tendency of the distribution cannot be captured.
+That being said, Development seems normally distributed even with few observatons.
+```{r}
+plot_histogram(df_development)
+```
+
+Q-Q plot is a probability plot, which is a visual way to compare two probability distribution by plotting their quantiles against each other.
+While children seems normally distributed, Development has its stractured tendency.
+```{r}
+plot_qq(df_development, by="Treatment")
+```
+
+
+There is the slight positive correlation between Children and Psychologist
+```{r}
+plot_correlation(df_development[c("Children", "Psychologist", "Development")])
+```
+
+```{r}
+plot_boxplot(df_development, by="Treatment")
+```
+
+
+Now, proceed to the analysis of the linear model. I use all variables
+Residual seems symmetric, but the gaussianity of the model is not obvious 
+just by looking at residuals.
+```{r}
+Y = df_development$Development
+F = as.factor(df_development$Treatment)
+L = lm(Y~., df_development[,1:3])
+summary(L)
+```
+QQ plot for the residual
+```{r}
+plot(L)
+```
+
+
+KS-test for checking the residual 
+H_0: Standardized residuals are gaussian.
+H_1: Otherwise
+
+P-value is big, so H_0, we can accept the gaussianity of the noise.
+```{r}
+sres=rstandard(L)
+ks.test(sres, "pnorm")
+```
+
+
+Treatment has an obvious influence on development 
+```{r}
+F = as.factor(df_development$Treatment)
+boxplot(Y~F)
+```
+
+*Analysis of variance(ANOVA)* is a collection of statistical models and their associated estimation procedures used to analyze the difference among means.
+ANOVA is based on the law of [total variance](https://en.wikipedia.org/wiki/Law_of_total_variance), providing a statistical test of whether two or more population means are equal, and generalizes the t-test beyond two means by using [F-test](https://en.wikipedia.org/wiki/F-test#:~:text=An%20F%2Dtest%20is%20any,which%20the%20data%20were%20sampled.)
+```{r}
+L=lm(Y~F)
+anova(L)
+```
+You can also see the small P-Value for F-Statistics
+
+
+
+
+```{r}
+R = df_development$Psychologist
+anova(lm(Y~R))
+boxplot(Y~R)
+```
+Large p-value
+Psychologist doesn't have a significant effect on the outcome
+
+
+Check the interaction of treatment with Children
+```{r}
+R = df_development$Children
+ancova=lm(Y~F+R+F*R) #mixture between a factor and a 
+  #numeric explanatory variables : ANalysis Of COvariance
+anova(ancova)
+anova(lm(Y~F+R))
+```
+
+
+# Data Modeling
+## Subset Linear Regression
+
+Here I check the Adjusted R-Square and Akaike information criterion(AIC)
+It seems the children and Psychologist doesnt
+```{r}
+L = lm(Y~., df_development[,1:3])
+ols_step_best_subset(L)
+```
+
+```{r}
+linear_regression<- lm(Y~., df_development[1:2])
+
+evaluation_development<- c(linear.regression=RMSE(linear_regression$fitted.values, Y))
+```
+
+
+## Ridge Regression
+
+Ridge regression can be used for avoiding the phenomenon of overfitting by penalizing the 
+coefficients of regressors. L2-norm is used for the shrinkage, that is to say, 
+$$
+L = L_{fit} + L_{regularization} = ||y - X.w||_2^2 + \alpha ||w||_2^2
+$$
+where alpha is the tunable parameter ranged from 0 to 1
+
+
+```{r}
+set.seed(42)
+cv.ridge<-cv.glmnet(model.matrix(Y~., df_development[,1:3]), df_development$Development, alpha=0)
+cv.ridge$lambda.min
+```
+
+```{r}
+plot(cv.ridge)
+```
+
+```{r}
+ridge_pred<-as.vector(predict(cv.ridge, newx=model.matrix(Y~., df_development[,1:3]), df_development$Development, alpha=0))
+
+
+evaluation_development<- c(evaluation_development, ridge.regression=RMSE(ridge_pred, Y))
+```
+
+      
+
+
+## Principal Component Regression
+
+```{r}
+set.seed(42)
+pcr_model<-pcr(Development~., data=df_development, validation="CV")
+summary(pcr_model)
+validationplot(pcr_model, legendpos="topright")
+```
+Three components give the least CV/adjCV error
+
+```{r}
+RMSE(pcr_model$fitted.values, Y)
+evaluation_development<- c(evaluation_development, PCR=RMSE(pcr_model$fitted.values, Y))
+```
+
+
+## Random Forest
+```{r}
+set.seed(42)
+random_forest<-randomForest(Y~.,data=df_development[1:3], ntree=500, mtry=3, importance=(TRUE))
+forest_pred<- predict(random_forest, df_development)
+RMSE(forest_pred, Y)
+evaluation_development<- c(evaluation_development, RandomForest=RMSE(forest_pred, Y))
+```
+
+```{r}
+#df = df %>% mutate_if(is.factor, as.numeric)
+#df$Treatment = strtoi(df$Treatment, 16L)
+```
+
+Replace categorical by its numerical representation
+
+
+## KNN Regression
+```{r}
+set.seed(42)
+knn <- KNNTrainer$new(k = 2,prob = T,type = 'reg')
+knn$fit(train = df, test = df, y = 'Development')
+probs <- knn$predict(type = 'prob')
+labels <- knn$predict(type='raw')
+RMSE(df_development$Development,labels)
+evaluation_development<- c(evaluation_development, KNN=RMSE(forest_pred, Y))
+```
+
+
+## XGBoost
+Gradient boosting is a machine learning technique for regression and classification problems, which produces a prediction model in the form of an ensemble of weak prediction models, typically decision trees
+```{r}
+library(xgboost)
+dtrain<-xgb.DMatrix(data=as.matrix(df[1:3]), label=as.matrix(df$Development))
+xgb<-xgboost(data=dtrain,
+             max.depth=2,
+             eta=1, 
+             nthread=2,
+             nrounds=100,
+             objective="reg:linear")
+```
+
+
+
+```{r}
+xgb_pred = predict(xgb, as.matrix(df[1:3]))
+RMSE(xgb_pred, df$Development)
+evaluation_development<- c(evaluation_development, XGBoost=RMSE(xgb_pred, df$Development))
+```
+
+
+
+```{r}
+library(lightgbm)
+dtrain<-lgb.Dataset(as.matrix(df_development[1:3]), label=df_development$Development)
+model <- lgb.cv(
+    params = list(
+        objective = "regression"
+        , metric = "rmse"
+        ,is_unbalance = TRUE
+        ,min_data=1)
+    , data = dtrain
+    , num_leaves=100
+    ,nrounds=10
+)
+
+```
+
+```{r}
+evaluation_development<- c(evaluation_development, LightGBM=model$best_score)
+```
+
+
+
+```{r}
+data.frame(as.matrix(evaluation_development))
+```
+
+
+
+
+
+
+# *Analysis of Grade*
+```{r}
+df_grade<-read.csv("data2.csv", sep=";")
+head(df_grade)
+```
+
+df_development(data1) have 1 discrete and 3 continuous variables with 12 observations.
+There is no missing value in this dataset
+```{r}
+introduce(df_grade)
+```
+
+Quantitative visualization oof the basic information about the dataset
+```{r}
+plot_intro(df_grade)
+plot_missing(df_grade)
+```
+No missing value with all continuous variables 
+
+
+Here each frequency shown in the distribution 
+```{r}
+plot_histogram(df_grade)
+```
+
+Q-Q plot is a probability plot, which is a visual way to compare two probability distribution by plotting their quantiles against each other.
+While children seems normally distributed, Development has its stractured tendency.
+```{r}
+plot_qq(df_grade, by="Grade")
+```
+
+```{r}
+plot_correlation(df_grade)
+```
+Relatively strong correlation between Bitter and Acid, Grade and Sugar, Pulpy and Sugar
+
+
+```{r}
+plot_boxplot(df_grade, by="Grade")
+```
+Interestingly, high value in Sugar suggest the high Grade
+
+
+```{r}
+plot_scatterplot(df_grade,  by="Grade")
+```
+It seems Sugar has positive correlation while Acid and Bitter have negative correlation
+
+
+```{r}
+L=lm(log(Grade)~.,data=df_grade)  #linear model
+summary(L)$r.squared
+plot(L)    
+```
+
+H_0:Standardized residual are gaussian
+```{r}
+sres=rstandard(L)
+ks.test(sres, "pnorm")
+```
+
+
+```{r}
+L = lm(df_grade$Grade~., df_grade)
+ols_step_best_subset(L)
+```
+
+```{r}
+set.seed(42)
+cv.ridge<-cv.glmnet(model.matrix(df_grade$Grade~., df_grade[1:5]), df_grade$Grade, alpha=0)
+cv.ridge$lambda.min
+```
+
+```{r}
+ridge_pred = predict(cv.ridge, newx=model.matrix(df_grade$Grade~., df_grade[1:5]))
+evaluation_grade<- c(Ridge=RMSE(ridge_pred, df_grade$Grade))
+```
+
+
+```{r}
+set.seed(42)
+random_forest<-randomForest(df_grade$Grade~.,data=df_grade[1:5], ntree=500, mtry=3, importance=(TRUE))
+forest_pred<- predict(random_forest, df_grade[1:5])
+RMSE(forest_pred, df_grade$Grade)
+evaluation_grade<- c(evaluation_grade, RandomForest=RMSE(forest_pred, df_grade$Grade))
+```
+
+
+## XGBoost
+```{r}
+library(xgboost)
+dtrain<-xgb.DMatrix(data=as.matrix(df_grade[1:5]), label=as.matrix(df_grade$Grade))
+xgb<-xgboost(data=dtrain,
+             max.depth=2,
+             eta=1, 
+             nthread=2,
+             nrounds=100,
+             objective="reg:linear")
+```
+
+```{r}
+xgb_pred = predict(xgb, as.matrix(df_grade[1:5]))
+RMSE(xgb_pred, df_grade$Grade)
+evaluation_grade<- c(evaluation_grade, XGBoost=RMSE(xgb_pred, df_grade$Grade))
+```
+
+
+```{r}
+library(lightgbm)
+dtrain<-lgb.Dataset(as.matrix(df_grade[1:5]), label=df_grade$Grade)
+model <- lgb.cv(
+    params = list(
+        objective = "regression"
+        , metric = "rmse"
+        ,is_unbalance = TRUE
+        ,min_data=1
+        ,min_hess=0)
+    , data = dtrain
+    , num_leaves=100
+    ,nrounds=10
+)
+```
+
+```{r}
+evaluation_grade<- c(evaluation_grade, LightGBM=model$best_score)
+```
+
+
+# Conclusion
+For data1, due to the lack of the number of variable and observation, the modeling process was not well established with those which requires large dataset.
+For data2, as we have more columns so RMSE is comparatively small.
+
+Overall, it was first time for me to make a machine learning model with such a small dataset.
+Although I have tried several models during selection, most of the algorithm such as XGB and lightGBM which perform well are based on decision tree method.
+That being said, this results cannot assure anything as basically, training dataset is exactly the same as the evaluation(test) set and therefore, this high performance is demonstrated by virtue of overfgitting. I did implement such a way that model overfits the dataset to show that those algorithms are so powerful that it is quite easy to overfit dataset. On top of that, I figure that it is not practical to split dataset into train and test as the size of data is already infinitesimal.
+
+In conclusion, this case study shows that even small dataset, those based on tree method outperforms traditional regression model.
+
+
+
+
+
+
+
