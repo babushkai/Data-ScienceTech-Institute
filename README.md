@@ -5,7 +5,7 @@ Exam and projects during MSc in Data Science at Data ScienceTech Institute
 ・[Time Series Analysis](Time-Series.pdf) \
 ・[Semantic Web](SemanticWeb.pdf) \
 ・[Agent Based Modeling](https://github.com/kwdaisuke/Data-ScienceTech-Institute/blob/main/ABM_Retail_DalsukeKuwabara.pdf) \
-・PROJECT: [TAKOTSUBO SYNDROME PREDICTION OF HOSPITALIZATION OUTCOMES](https://github.com/kwdaisuke/Takotsubo-Syndrome-Prediction-of-Hospitalization-Outcomes)
+・[TAKOTSUBO SYNDROME PREDICTION OF HOSPITALIZATION OUTCOMES](https://github.com/kwdaisuke/Takotsubo-Syndrome-Prediction-of-Hospitalization-Outcomes)
 
 ## Reference
 DSTI website: https://www.datasciencetech.institute/
