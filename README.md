@@ -2,7 +2,7 @@
 Exam and projects during MSc in Data Science at Data ScienceTech Institute
 
 ・[Foundation of statistical analysis and machine learning](https://github.com/kwdaisuke/Data-ScienceTech-Institute/blob/main/FSML%20Exam.pdf) \
-・[SQL Converter](https://github.com/kwdaisuke/Data-ScienceTech-Institute/tree/main/SQLConverter)
+・[SQL Converter](https://github.com/kwdaisuke/Data-ScienceTech-Institute/tree/main/SQLConverter) \
 ・[Time Series Analysis](Time-Series.pdf) \
 ・[Semantic Web](SemanticWeb.pdf) \
 ・[Agent Based Modeling](https://github.com/kwdaisuke/Data-ScienceTech-Institute/blob/main/ABM_Retail_DalsukeKuwabara.pdf) \
