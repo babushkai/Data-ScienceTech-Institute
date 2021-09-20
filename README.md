@@ -1,5 +1,5 @@
 # Data-ScienceTech-Institute
-Exam and projects during MSc in Data Science at Data ScienceTech Institute
+Exam and projects during MSc in Data Science/Artificial Intelligence at Data ScienceTech Institute
 
 ・[Foundation of statistical analysis and machine learning](https://github.com/kwdaisuke/Data-ScienceTech-Institute/blob/main/FSML%20Exam.pdf) \
 ・[SQL Converter](https://github.com/kwdaisuke/Data-ScienceTech-Institute/tree/main/SQLConverter) \
