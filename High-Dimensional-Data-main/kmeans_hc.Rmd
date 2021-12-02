@@ -1,0 +1,124 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+data(swiss)
+?swiss
+
+```
+> Remark: We observe here that 'hclust' can be applied to any type of data if we are able to compute for these data. Conversely, kmeans is restricted to continuous data due to the need to compute centers.
+
+> Exercises: Apply the different methods (group distances) of HC to compare the results.
+
+```{r}
+library(class)
+?hclust
+D = dist(swiss)
+
+par(mfrow=c(2,2))
+hc1 = hclust(D, method="complete"); plot(hc1)
+hc2 = hclust(D, method="single"); plot(hc2)
+hc3 = hclust(D, method="centroid"); plot(hc3)
+hc4 = hclust(D, method="ward.D2");plot(hc4)
+```
+
+```{r}
+install.packages("cluter")
+#install.packages("factoextra")
+#install.packages("gridExtra")
+library(tidyverse)
+library(cluter)
+library(gridExtra)
+```
+```{r}
+kmeans2 <- kmeans(as.matrix(swiss), centers=2)
+```
+
+
+> Remark: we can see here that the different methods lead to quite different dendrogram, leading in turn to different choices of numbers of clusters.
+> Good analysis is the one which helps analyst; you need to be clear with those analysis by yourself
+> Let's remember that the clustering aims to help the analyst to understand the data. The choice of a method should be done according to this idea!
+
+> A good way to verify that the different clustering make sense or not is to visualize the data with the clustering as an additional information (thanks to the colors)
+
+```{r}
+hc4=hclust(D,method="ward.D2")
+cl4=cutree(hc4, k=2)
+cl4
+```
+```{r}
+plot(swiss, col=cl4, pch=19)
+
+```
+
+Let's now compare the different cluserings on two specific variables(Catholic vs. Agriculture)
+
+```{r}
+cl1 = cutree(hc1, k=3)
+cl2 = cutree(hc2, k=4)
+cl3 = cutree(hc3, k=3)
+par(mfrow=c(2,2))
+plot(swiss[, c(3,5)], col=cl1, pch=19, main="Complete")
+# Charles likes single linkage
+plot(swiss[, c(3,5)], col=cl1, pch=19, main="Single")
+plot(swiss[, c(3,5)], col=cl1, pch=19, main="Centroid")
+plot(swiss[, c(3,5)], col=cl1, pch=19, main="Ward")
+```
+
+## Kmeans
+Let's now have a look at the same data with kmeans
+```{r}
+?kmeans
+```
+
+```{r}
+data(swiss)
+out=kmeans(swiss, centers=3)
+out
+```
+> Remark: K-means calculates the variance of each cluster
+
+```{r}
+library(factoextra)
+fviz_cluster(out, data= swiss, 
+             palette = c("#2E9FDF", "#00AFBB", "#E7B800"), 
+             geom = "point",
+             ellipse.type = "convex", 
+             ggtheme = theme_bw())
+```
+
+```{r}
+J = rep(NA, 15)
+for (k in 1:15){
+  out = kmeans(swiss, center=k)
+  J[k] = out$betweens/out$totss
+}
+plot(J, type="b")
+```
+
+> Remarks: K-means is sensitive to the initialization. We observe on this small run that curve can change with different initializations a nnd we can even observe non increasing curves for unlucky initializations. A way to avoid this initialization effect, we can average on several runs for each value of k: 
+
+```{r}
+J = matrix(NA, 10, 15)
+for (k in 1:15){
+  for (l in 1:10)
+    out = kmeans(swiss, center=k)
+    J[l, k] = out$betweens/out$totss
+}
+boxplot(J, type="b")
+```
+> On this example, I'd probabily pick $k^*=5$ as the most appropriate number of clusters.
+
+> Exercise: visualize the clustering result with a pair plot and compare to the ones obtained with hclust
+
+```{r}
+out5 = kmeans(swiss, centers=5, nstart=10)
+plot(swiss, col=out5$cluster, pch=19)
+```
+
+```{r}
+plot(swiss[,c(5,2)], col=out5$cluster, pch=19)
+```
+

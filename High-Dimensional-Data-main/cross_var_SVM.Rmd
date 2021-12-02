@@ -1,0 +1,459 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Reminder on descriptive statistics
+
+```{r}
+data(iris)
+X = iris$Sepal.Length
+```
+
+Let's look at the histogram of this variable:
+
+```{r}
+hist(X)
+```
+
+As I said, it is possible to tell a very different stoty with the histogram if we use a different number of breaks:
+
+```{r}
+hist(X,breaks = 100)
+```
+
+The selection of the number of slices can be performed automatically in R with a least 3 different algorithms!
+
+It is also interesting to combine the histogram with an estimation of the pdf function made by `density`:
+
+```{r}
+hist(X,freq = FALSE)
+lines(density(X),col=2,lwd=2)
+```
+
+Let's now use boxplots:
+
+```{r}
+boxplot(X)
+```
+
+and to relate the boxplot with the histogram:
+
+```{r}
+par(mfrow=c(2,1))
+hist(X,freq = FALSE)
+lines(density(X),col=2,lwd=2)
+boxplot(X,horizontal = TRUE)
+```
+
+Regarding multivariate data, it is possible for the iris data to plot several boxplots side by side because the 4 variables are all expressed on the same unit (cm).
+
+```{r}
+boxplot(iris[,-5])
+```
+
+The alternative would be:
+
+```{r}
+par(mfrow=c(2,2))
+for (j in 1:4) boxplot(iris[,j],main=paste('variable',j))
+```
+
+About scatterplot / pair plot now:
+
+```{r}
+plot(iris[,-5])
+```
+
+It is possible to add to this plot an additional categorical variable (here the species):
+```{r}
+plot(iris[,-5],col=as.numeric(iris$Species))
+```
+
+of course, it is possible to have a classical scatter plot when looking only at 2 variables:
+
+```{r}
+plot(iris$Sepal.Length,iris$Petal.Length,col=as.numeric(iris$Species))
+```
+
+## Multivariate numerical indicators
+
+Mean:
+
+```{r}
+data(iris)
+mu = colMeans(iris[,-5])
+mu
+```
+
+Covariance and correlation matrices:
+```{r}
+S = cov(iris[,-5])
+S
+
+C = cor(iris[,-5])
+C
+```
+
+# The learning process in supervised classification
+
+## LDA and logistic regression
+
+Let's first apply LDA on the iris data:
+```{r}
+data(iris)
+X = iris[,-5]
+Y = as.numeric(iris$Species)
+
+library(MASS)
+system.time(f <- lda(X,Y))
+```
+
+After the learning, it is possible to examine the output:
+
+```{r}
+f
+```
+
+Afterward, if we would like to classify a new observation, we have to call the `predict` function:
+
+```{r}
+xstar = c(6, 2.9, 5, 3)
+ystar = predict(f,xstar)
+ystar
+```
+
+> Exercise: evaluate with the minimal setup or V-fold cross-validation the error rate that we can expect for LDA on this classification problem.
+
+```{r}
+n = nrow(X)
+learn = sample(1:n,2/3*n)
+f <- lda(X[learn,],Y[learn])
+ystar = predict(f,X[-learn,])
+
+# Computer the classification error
+err = sum(Y[-learn] != ystar$class) / length(ystar$class)
+err
+```
+
+A better version with resampling:
+
+```{r}
+n = nrow(X)
+err = c()
+for (i in 1:10){
+  learn = sample(1:n,2/3*n)
+  f <- lda(X[learn,],Y[learn])
+  ystar = predict(f,X[-learn,])
+
+  # Computer the classification error
+  err[i] = sum(Y[-learn] != ystar$class) / length(ystar$class)
+}
+boxplot(err)
+```
+
+## Classification with KNN
+
+A basic call to KNN is as follows:
+
+```{r}
+data(iris)
+X = iris[,-5]
+Y = as.numeric(iris$Species)
+
+library(class)
+?knn
+
+xstar = c(6, 2.9, 5, 3)
+ystar = knn(X,xstar,Y,k = 5)
+ystar
+```
+
+> Exercise: evaluate with a V-fold cross-validation the performance of KNN (with K=5) on the iris data set.
+
+```{r}
+library(MASS)
+V = 25
+n = nrow(X)
+fold = rep(1:V,n/V)
+err.knn5 = err.lda = rep(NA,V)
+for (v in 1:V){
+  learn = which(fold != v)
+  test = which(fold == v)
+  
+  # KNN
+  ystar = knn(X[learn,],X[test,],Y[learn],k = 5)
+  err.knn5[v] = sum(ystar != Y[test]) / length(ystar)
+  
+  # LDA
+  f <- lda(X[learn,],Y[learn])
+  ystar = predict(f,X[test,])$class
+  err.lda[v] = sum(ystar != Y[test]) / length(ystar)
+}
+cat(paste('> KNN5:',mean(err.knn5),'+/-',sd(err.knn5),'\n'))
+cat(paste('> LDA:',mean(err.lda),'+/-',sd(err.lda),'\n'))
+```
+
+> Exercise: use V-fold cross-validation to find the appropriate value for K in KNN on the iris classification problem.
+
+```{r}
+library(MASS)
+V = 25 ; K = 30
+n = nrow(X)
+fold = rep(1:V,n/V)
+err.knn = matrix(NA,K,V)
+
+for (v in 1:V){
+  learn = which(fold != v)
+  test = which(fold == v)
+  for (k in 1:K){
+    ystar = knn(X[learn,],X[test,],Y[learn],k)
+    err.knn[k,v] = sum(ystar != Y[test]) / length(ystar)
+  }
+}
+plot(rowMeans(err.knn),type='b')
+```
+
+On this run, we would pick K=11.
+
+> WARNING: To compare the performance of KNN in general with LDA, we should use double CV for both picking the best K and evaluating the performance
+
+
+```{r}
+library(MASS)
+V = 25
+n = nrow(X)
+fold = rep(1:V,n/V)
+err.knn = err.lda = rep(NA,V)
+for (v in 1:V){
+  learn = which(fold != v)
+  test = which(fold == v)
+  
+  # KNN (with an internal CV for picking K)
+  X2 = X[learn,]; Y2 = Y[learn]
+  K = 30; n2 = nrow(X2)
+  fold2 = rep(1:V,n2/V)
+  err.knn2 = matrix(NA,K,V)
+
+  for (v2 in 1:V){ # Start of the internal CV
+    learn2 = which(fold2 != v2)
+    test2 = which(fold2 == v2)
+    for (k in 1:K){
+      ystar = knn(X2[learn2,],X2[test2,],Y2[learn2],k)
+      err.knn2[k,v2] = sum(ystar != Y2[test2]) / length(ystar)
+    }
+  }
+  Kstar = which.min(rowMeans(err.knn2)) # Choice of K* for this fold
+  
+  # Evaluation of the error for this fold
+  ystar = knn(X[learn,],X[test,],Y[learn],k = Kstar)
+  err.knn[v] = sum(ystar != Y[test]) / length(ystar) 
+  
+  # LDA
+  f <- lda(X[learn,],Y[learn])
+  ystar = predict(f,X[test,])$class
+  err.lda[v] = sum(ystar != Y[test]) / length(ystar)
+}
+cat(paste('> KNN:',mean(err.knn),'+/-',sd(err.knn),'\n'))
+cat(paste('> LDA:',mean(err.lda),'+/-',sd(err.lda),'\n'))
+```
+
+## Classification with SVM
+
+The SVM function is provided in R within different packages. In particular, the package 'e1071' provides a nice implementation of SVM.
+
+```{r}
+#install.packages('e1071')
+library(e1071)
+```
+
+A basic use of SVM on the iris data would be:
+
+```{r}
+data(iris)
+X = iris[,-5]
+Y = as.numeric(iris$Species)
+
+xstar = c(6, 2.9, 5, 3)
+f.svm = svm(X,Y,kernel = 'radial',gamma = 1,type = "C-classification")
+ystar = predict(f.svm,matrix(xstar,nrow=1))
+ystar
+```
+
+> Exercise: use cross-validation to find the best value for gamma within the RBF kernel for this classification task.
+
+```{r}
+V = 25 ; GAMMA = seq(0.01,1,by=0.01)
+n = nrow(X)
+fold = rep(1:V,n/V)
+err.svm = matrix(NA,length(GAMMA),V)
+
+for (v in 1:V){
+  learn = which(fold != v)
+  test = which(fold == v)
+  for (j in 1:length(GAMMA)){
+    gamma = GAMMA[j]
+    f.svm = svm(X[learn,],Y[learn],kernel='radial',gamma=gamma,
+                type= "C-classification")
+    ystar = predict(f.svm,X[test,])
+    err.svm[j,v] = sum(ystar != Y[test]) / length(ystar)
+  }
+}
+plot(GAMMA,rowMeans(err.svm),type='b')
+title(main=paste('Best gamma value:',GAMMA[which.min(rowMeans(err.svm))],'\n'))
+```
+
+> Exercise: apply double cross-validation to find the best kernel (among linear, radial and polynomial) for SVM and compare to KNN and LDA (with 10-fold CV)
+
+```{r}
+V = 10; n = nrow(X)
+fold = rep(1:V,n/V)
+err.knn = err.lda = rep(NA,V)
+err.svm1 = err.svm2 = err.svm3 = rep(NA,V)
+for (v in 1:V){
+  learn = which(fold != v)
+  test = which(fold == v)
+  
+  # KNN (with an internal CV for picking K)
+  X2 = X[learn,]; Y2 = Y[learn]
+  K = 15; n2 = nrow(X2)
+  fold2 = rep(1:V,n2/V)
+  err.knn2 = matrix(NA,K,V)
+
+  for (v2 in 1:V){ # Start of the internal CV
+    learn2 = which(fold2 != v2)
+    test2 = which(fold2 == v2)
+    for (k in 1:K){
+      ystar = knn(X2[learn2,],X2[test2,],Y2[learn2],k)
+      err.knn2[k,v2] = sum(ystar != Y2[test2]) / length(ystar)
+    }
+  }
+  Kstar = which.min(rowMeans(err.knn2)) # Choice of K* for this fold
+  
+  # Evaluation of the error for this fold
+  ystar = knn(X[learn,],X[test,],Y[learn],k = Kstar)
+  err.knn[v] = sum(ystar != Y[test]) / length(ystar) 
+  
+  # LDA #############
+  f <- lda(X[learn,],Y[learn])
+  ystar = predict(f,X[test,])$class
+  err.lda[v] = sum(ystar != Y[test]) / length(ystar)
+  
+  # SVM linear #############
+  f.svm = svm(X[learn,],Y[learn],kernel = 'linear',type = "C-classification")
+  ystar = predict(f.svm,X[test,])
+  err.svm1[v] = sum(ystar != Y[test]) / length(ystar)
+  
+  # SVM radial #############
+  X2 = X[learn,]; Y2 = Y[learn]; n2 = nrow(X2)
+  GAMMA = seq(0.01,1,by=0.01); int.svm2 = matrix(NA,length(GAMMA),V)
+  fold2 = rep(1:V,n2/V)
+
+  for (v2 in 1:V){ # Start of the internal CV
+    learn2 = which(fold2 != v2)
+    test2 = which(fold2 == v2)
+    for (j in 1:length(GAMMA)){
+      gamma = GAMMA[j]
+      f.svm = svm(X2[learn2,],Y2[learn2],kernel='radial',gamma=gamma,
+                type= "C-classification")
+      ystar2 = predict(f.svm,X2[test2,])
+      int.svm2[j,v2] = sum(ystar2 != Y2[test2]) / length(ystar2)
+    }
+  }
+  GammaStar = GAMMA[which.min(rowMeans(int.svm2))]
+  
+  # Evaluation of the error for this fold
+  f.svm = svm(X[learn,],Y[learn],kernel = 'radial',gamma = GammaStar,
+              type = "C-classification")
+  ystar = predict(f.svm,X[test,])
+  err.svm2[v] = sum(ystar != Y[test]) / length(ystar)
+}
+cat(paste('> KNN:',mean(err.knn),'+/-',sd(err.knn),'\n'))
+cat(paste('> LDA:',mean(err.lda),'+/-',sd(err.lda),'\n'))
+cat(paste('> SVM linear:',mean(err.svm1),'+/-',sd(err.svm1),'\n'))
+cat(paste('> SVM radial:',mean(err.svm2),'+/-',sd(err.svm2),'\n'))
+```
+
+
+# Unsupervised learning
+
+## Dimension reduction with PCA
+
+```{r}
+data(iris)
+X = iris[,-5]
+cls = as.numeric(iris$Species)
+
+# The usual manner to do PCA in R
+pca = princomp(X)
+biplot(pca)
+```
+
+We can compare the observations in the orignal space with their projection on the new variables:
+
+```{r}
+Y = predict(pca)[,1:2]
+
+# coordinates of the 1st individual in the original space (X)
+X[1,]
+
+# coordinates of the 1st individual in the projection space (Y = X * U)
+Y[1,]
+
+plot(Y,col=cls)
+```
+
+## Another example of PCA with the decatholon data
+
+Let's first load the data (from internet):
+
+```{r}
+decathlon = read.table("http://math.agrocampus-ouest.fr/infoglueDeliverLive/digitalAssets/108286_decathlon.csv",header=TRUE,sep=';')
+
+dim(X)
+```
+
+```{r}
+X =  decathlon[,2:11]
+rownames(X) = decathlon$X
+```
+
+Excercise: Perform
+```{r}
+# 500m has a strong correlation ← means very important 
+pca = princomp(X)
+par(mfrow=c(1,2))
+biplot(pca, col=c(0,2))
+
+Y = predict(pca)[,1:2]
+plot(Y, type='n')
+text(Y, labels=rownames(X))
+```
+
+```{r}
+Y = predict(pca)[,1:2]
+
+# coordinates of the 1st individual in the original space (X)
+X[1,]
+
+# coordinates of the 1st individual in the projection space (Y = X * U)
+Y[1,]
+
+plot(Y, type='n')
+text(Y, labels=rownames(X))
+```
+
+
+```{r}
+summary(pca)
+```
+
+Here, two PCA components are enough to explain 93% of the variance
+The other rule is to look for a break in the eigenvalue script
+```{r}
+screeplot(pca)
+```
+
+On this example, we perhaps would prefer $d=3$
+Normalization: There is no firm theory to ensure that normalization works
+

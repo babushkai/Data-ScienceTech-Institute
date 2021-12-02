@@ -1,0 +1,152 @@
+
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Reminder on descriptive statistics
+```{r}
+data(iris)
+X = iris$Sepal.Length
+```
+
+It tells a vert different story with the histogram if we use the different number of breaks:
+
+```{r}
+hist(X, breaks=nclass.FD(X))
+```
+
+```{r}
+hist(X, breaks=40)
+```
+The selection of the number of slices can be performed automatically in R with at least 3 different algorithms
+
+It is also interesting to combine the histogram with an estimation of the pdf function mode by 'density':
+
+```{r}
+hist(X, freq=FALSE)
+lines(density(X), col=2, lwd=2)
+```
+
+
+```{r}
+boxplot(X)
+```
+
+```{r}
+par(mfrow=c(2,1))
+hist(X, freq=FALSE)
+lines(density(X), col=2, lwd=2)
+boxplot(X, horizontal=TRUE)
+```
+Regarding multivariate data, it is possible for the iris data to plot several boxplots side by side because the 4 variables are all expressed on the same unit(cm).
+
+```{r}
+boxplot(iris[,-5])
+
+```
+The alternative would be:
+
+```{r}
+par(mfrrow=c(2,2))
+for (j in 1:4) boxplot(iris[,j], main=paste("variable", j))
+```
+
+```{r}
+plot(iris[,-5])
+```
+
+It is possible to add to this plot an additional species):
+```{r}
+plot(iris[,-5], col=as.numeric(iris$Species))
+```
+
+```{r}
+plot(iris$Sepal.Length, iris$Petal.Length, col=as.numeric(iris$Species))
+```
+
+Mean of each variable 
+```{r}
+data(iris)
+mu = colMeans(iris[, -5])
+mu
+# Cannot use mean function as it calculates mean of all values and returns scalar
+## Multivariate numerical indicators
+
+```
+
+Covariance and correlation matrices:
+```{r}
+S = cov(iris[,-5])
+S
+C = cor(iris[,-5])
+C
+```
+
+# The learning process in supervised classification
+
+## LDA and logistic regression
+
+Let's first apply LDA on the iris data:
+```{r}
+data(iris)
+X = iris[,-5]
+Y = as.numeric(iris$Species)
+
+library(MASS)
+system.time((f = lda(X,Y)))
+```
+
+After the learning, it is possible to examine the output:
+
+```{r}
+f
+```
+Call:
+lda(X, Y)
+
+Afterward, if we would like to classify a new observation, we have to call the `predict` fuction:
+
+```{r}
+xstar = c(6, 2.9, 5, 3) # Four variable to make one new observation
+ystar = predict(f, xstar)
+ystar
+```
+Posterior probability is the class it is classified as
+→3 in this case
+
+
+```{r}
+f = lda(X,Y, cv=TRUE)
+predict(f, xstar)
+```
+
+
+```{r}
+n = nrow(X)
+learn = sample(1:n, 2/3*n)
+f <- lda(X[learn,], Y[learn])
+ystar = predict(f, X[-learn,])
+
+# Compute the classification error
+err = sum(Y[-learn] != ystar$class) / length(ystar$class)
+err
+```
+There is no error in this case, model parfectly predict the class of each observation 
+
+```{r}
+n = nrow(X)
+err = c()
+for (i in 1:10){
+  learn = sample(1:n, 2/3*n) # This is the stochastic sampling process
+  f <- lda(X[learn,], Y[learn])
+  ystar = predict(f, X[-learn,])
+  
+  # Compute the classification error
+  
+  err[i] = sum(Y[-learn] != ystar$class) / length(ystar$class)
+}
+boxplot(err)
+```
+}
+```

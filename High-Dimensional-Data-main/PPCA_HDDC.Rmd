@@ -1,0 +1,145 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Learning in high dimensions
+
+## Mixture of PPCA and HDDC
+
+The two methods are available in the HDclassif package:
+
+```{r}
+#install.packages('HDclassif')
+library(HDclassif)
+```
+
+The package contains two main functions:
+
+- `hddc` which allows to cluster high-dimensional data,
+- `hdda` for the supervised classification of HD data.
+
+Let's first focus on the *supervised classification problem*, and let's compare hdda with LDA and SVM for instance. Let's first load some HD data from the `MBCbook` package:
+
+```{r}
+#install.packages('MBCbook')
+library(MBCbook)
+data("usps358")
+```
+
+These data are vectorized version of handwritten digits provided by the U.S. Post Service. It is possible to visualize the 16x16 images as follows:
+
+```{r}
+X = usps358[,-1]
+cls = usps358$cls
+
+# Visulise some of the digits:
+par(mfrow = c(1,4))
+imshow(matrix(t(X[134,]),nrow = 16,byrow = TRUE))
+imshow(matrix(t(X[1278,]),nrow = 16,byrow = TRUE))
+imshow(matrix(t(X[564,]),nrow = 16,byrow = TRUE))
+imshow(matrix(t(X[869,]),nrow = 16,byrow = TRUE))
+```
+
+A basic call of hdda is as follows:
+
+```{r}
+learn = sample(1:nrow(X),1500)
+f = hdda(X[learn,],cls[learn])
+Yhat = predict(f,X[-learn,])
+err.hdda = sum(Yhat$class != cls[-learn]) / length(Yhat$class)
+err.hdda
+```
+
+Here, because we have a fitted GMM, we can have a look at the model parameters:
+
+```{r}
+# the class-specific dimensionalities
+f$d
+
+# The variance of the data within the class-specific subspaces
+f$a
+
+# The variance of the noise ouside the subspaces
+f$b
+```
+
+It is of course possible to look at the means as average digits:
+
+```{r}
+par(mfrow = c(1,3))
+imshow(matrix(t(f$mu[1,]),nrow = 16,byrow = TRUE))
+imshow(matrix(t(f$mu[2,]),nrow = 16,byrow = TRUE))
+imshow(matrix(t(f$mu[3,]),nrow = 16,byrow = TRUE))
+```
+
+
+> Exercise: look at the effect of varying the threshold $\tau$ on the classification error.
+
+```{r}
+tau = seq(200, 1,by = -10) / 1000
+err = matrix(NA,10,20)
+for (i in 1:10){cat('.')
+  learn = sample(1:nrow(X),1500)
+  for (j in 1:length(tau)){
+    f = hdda(X[learn,],cls[learn],threshold = tau[j])
+    Yhat = predict(f,X[-learn,])
+    err[i,j] = sum(Yhat$class != cls[-learn]) / length(Yhat$class)
+  }
+}
+plot(tau,colMeans(err),type='b')
+```
+
+In fact, hdda implements an internal CV for selecting the best $\tau$ for the data at hand:
+
+```{r}
+learn = sample(1:nrow(X),1500)
+f = hdda(X[learn,],cls[learn],d_select="CV",
+         cv.threshold = c(0.2,0.1,0.05,0.01,0.005,0.001))
+Yhat = predict(f,X[-learn,])
+err.hdda = sum(Yhat$class != cls[-learn]) / length(Yhat$class)
+err.hdda
+```
+
+> Exercise: compare HDDA with LDA on this data set.
+
+```{r}
+err = matrix(NA,2,25)
+for(i in 1:25){
+  learn = sample(1:nrow(X),1500)
+  f = hdda(X[learn,],cls[learn],d_select="CV",
+         cv.threshold = c(0.2,0.1,0.05,0.01,0.005,0.001))
+  Yhat = predict(f,X[-learn,])
+  err[1,i] = sum(Yhat$class != cls[-learn]) / length(Yhat$class)
+
+  g = lda(X[learn,],cls[learn])
+  Yhat = predict(g,X[-learn,])
+  err[2,i] = sum(Yhat$class != cls[-learn]) / length(Yhat$class)
+}
+boxplot(t(err),names=c('HDDA','LDA'),col=c('lavender','pink'))
+```
+
+Let's now move to the *clustering problem*:
+
+```{r}
+data("usps358")
+X = usps358[,-1]
+cls = usps358$cls
+
+out = hddc(X,K = 3)
+
+table(cls, out$class)
+```
+
+Of course, we can here also visualize the group means to understand the average individual of each group:
+
+```{r}
+par(mfrow = c(1,3))
+imshow(matrix(t(out$mu[1,]),nrow = 16,byrow = TRUE))
+imshow(matrix(t(out$mu[2,]),nrow = 16,byrow = TRUE))
+imshow(matrix(t(out$mu[3,]),nrow = 16,byrow = TRUE))
+```
+
+> Exercise: compare the clustering results of HDDC and Mclust.
+
+> Exercise: use BIC to select both the appropriate HDDC submodel and the value of K. 

@@ -1,0 +1,333 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Unsupervised learning
+
+## Dimension reduction with PCA
+
+```{r}
+data(iris)
+X = iris[,-5]
+cls = as.numeric(iris$Species)
+
+# The usual manner to do PCA in R
+pca = princomp(X)
+biplot(pca)
+```
+
+We can compare the observations in the orignal space with their projection on the new variables:
+
+```{r}
+Y = predict(pca)[,1:2] # Projection of the original data on the two first PC axes
+
+# #The `predict` action is equivalent to these actions:
+# U = pca$loadings[,1:2]
+# dim(U) # 4 x 2
+# Y = as.matrix(X) %*% U
+# dim(Y)
+
+# coordinates of the 1st individual in the original space (X)
+X[1,]
+
+# coordinates of the 1st individual in the projection space (Y = X * U)
+Y[1,]
+
+plot(Y,col=cls)
+```
+
+## Another example of PCA with the decathlon data
+
+Let's first load the data (from internet):
+
+```{r}
+decathlon = read.table("http://math.agrocampus-ouest.fr/infoglueDeliverLive/digitalAssets/108286_decathlon.csv",header=TRUE,sep=';')
+
+dim(decathlon)
+```
+
+Let's just now focus on the athlet performance data:
+
+```{r}
+X = decathlon[,2:11] # We only keep the data related to the 10 competitions
+rownames(X) = decathlon$X
+```
+
+> Exercise: perform a PCA and visualise the data in a 2-dimensional space. Then, indentify the most performant athelets.
+
+```{r}
+pca = princomp(X)
+
+par(mfrow=c(1,2))
+biplot(pca,col=c(0,2))
+#biplot(pca,col=c(1,0))
+
+Y = predict(pca)[,1:2]
+plot(Y,type='n')
+text(Y,labels = rownames(X))
+```
+
+## Selection of the numbers of axes to retain
+
+One of the rules is to retain the nb of axes such that the percentage of explained variance is larger to 90%:
+
+```{r}
+summary(pca)
+```
+
+Here, two PCA components are enough to explain 93% of the variance.
+
+The other rule it to look for a break in the eigenvalue scree:
+
+```{r}
+screeplot(pca)
+```
+
+On this example, we perhaps would prefer $d=3$.
+
+
+## PCA on scaled data
+
+```{r}
+pca = princomp(X,cor = TRUE)
+
+par(mfrow=c(1,2))
+biplot(pca,col=c(0,2))
+#biplot(pca,col=c(1,0))
+
+Y = predict(pca)[,1:2]
+plot(Y,type='n')
+text(Y,labels = rownames(X))
+```
+
+# Clustering
+
+## Hierarchical clustering
+
+In order to highlight the main features of kmeans and HC, let's consider the `swiss` data:
+
+```{r}
+data(swiss)
+?swiss
+```
+
+Let's first try to apply HC on these data. A general call to HC in R can be done as follows:
+
+```{r}
+library(class)
+? hclust
+
+D = dist(swiss)
+hc = hclust(D,method = "complete")
+plot(hc)
+```
+
+> Remark: we observe here that `hclust` can be applied to any type of data if we are able to compute a distance for these data. Conversly, kmeans is mostly restricted to continuous data due to the need to compute centers.
+
+> Exercise: apply the different methods (group distances) of HC to compare the results.
+
+```{r}
+D = dist(swiss)
+par(mfrow=c(2,2))
+hc1 = hclust(D,method = "complete"); plot(hc1)
+hc2 = hclust(D,method = "single"); plot(hc2)
+hc3 = hclust(D,method = "centroid"); plot(hc3)
+hc4 = hclust(D,method = "ward.D2"); plot(hc4)
+```
+
+> Remark: we can see here that the different methods lead to quite different dendrogram, leading in turn to different choices of numbers of clusters.
+
+Let's remember that the clustering aims to help the analyst to understand the data. The choice of a method should be done according to this idea!
+
+A good way to verify that the different clustering make sense or not is to visualise the data with the clustering as an additional information (thanks to the colors).
+
+```{r}
+hc4 = hclust(D,method = "ward.D2")
+cl4 = cutree(hc4,k = 2)
+cl4
+```
+
+```{r}
+plot(swiss,col=cl4,pch=19)
+```
+
+Let's now compare the different clusterings on two specific variables (Catholic vs. Agriculture):
+
+```{r}
+cl1 = cutree(hc1,k = 3)
+cl2 = cutree(hc2,k = 4)
+cl3 = cutree(hc3,k = 3)
+par(mfrow = c(2,2))
+plot(swiss[,c(3,5)],col=cl1,pch=19,main='Complete')
+plot(swiss[,c(3,5)],col=cl2,pch=19,main='Single')
+plot(swiss[,c(3,5)],col=cl3,pch=19,main='Centroid')
+plot(swiss[,c(3,5)],col=cl4,pch=19,main='Ward')
+```
+
+## Kmeans
+
+Let's now have a look at the same data with kmeans.
+
+```{r}
+?kmeans
+```
+
+A basic call to kmeans would be:
+
+```{r}
+data(swiss)
+out = kmeans(swiss,centers = 2)
+out
+```
+
+> Exercise: write a short script that plot the curve of J(k) for the data set at hand.
+
+
+```{r}
+J = rep(NA,15)
+for (k in 1:15){
+  out = kmeans(swiss,centers = k)
+  J[k] = out$betweenss / out$totss
+}
+
+plot(J,type='b')
+```
+
+We observe on this small run that the curve can change with different initializations and we can even observe some non increasing curves for unlucky initializations. A way to avoid this initialization effect, we can average on several runs for each value of k:
+
+```{r}
+J = matrix(NA,10,15)
+for (k in 1:15){
+  for (l in 1:10){
+    out = kmeans(swiss,centers = k)
+    J[l,k] = out$betweenss / out$totss
+  }
+}
+
+boxplot(J,type='b')
+```
+
+On this example, I'd probably pick $k^*=5$ as the most appropriate number of clusters.
+
+> Exercise: visualise the clustering result with a pair plot, and compare to the ones obtained with hclust.
+
+```{r}
+out5 = kmeans(swiss, centers = 5, nstart = 10)
+plot(swiss,col=out5$cluster,pch=19)
+```
+
+It looks like the two most discriminative variables are here 'Agriculture' and 'Catholic':
+
+```{r}
+plot(swiss[,c(5,2)],col=out5$cluster,pch=19)
+```
+
+Here, we clearly see that kmeans has a tendecy to create additional groups to model elongated clusters. So, here, perhaps, the kmeans solution with 3 groups would be better.
+
+```{r}
+out3 = kmeans(swiss, centers = 3, nstart = 10)
+plot(swiss[,c(5,2)],col=out3$cluster,pch=19)
+```
+
+## The GMM and the EM algorithm
+
+The EM algorithm is implemented for R in the `mclust` package:
+
+```{r}
+#install.packages("mclust")
+library(mclust)
+```
+
+The help of the package is available as usual:
+
+```{r}
+?Mclust
+```
+
+A basic call to Mclust is as follows:
+
+```{r}
+data(swiss)
+out = Mclust(swiss, G = 3)
+```
+
+> Exercise: have a look at what is inside `out` and to relate it with the GMM.
+
+```{r}
+out
+```
+
+```{r}
+out$parameters
+```
+
+```{r}
+out$loglik
+```
+
+```{r}
+out$classification
+```
+
+> Exercise: Compare the GMM clustering with the ones obtained with kmeans and hclust.
+
+```{r}
+# Simple visualization of GMM result
+data(swiss)
+out = Mclust(swiss, G = 3)
+plot(swiss, col=out$classification, pch=19)
+
+# Comparison with kmeans and hclust on two specific variables (Examination / Catholic for instance)
+par(mfrow = c(1,3))
+D = dist(swiss)
+hc = hclust(D,method = "single"); out.hc = cutree(hc,4)
+plot(swiss[,c(5,2)],col=out.hc,pch=19,cex = 3,main='HC (single)')
+out.km = kmeans(swiss, centers = 3, nstart = 10)
+plot(swiss[,c(5,2)],col=out.km$cluster,pch=19,cex = 3,main='kmeans')
+plot(swiss[,c(5,2)],col=out$classification,pch=19,cex = 3,main='GMM + EM algo.')
+```
+
+Mclust offers the possibility to test for several submodels and several number of components / groups ($K$ in the course and $G$ in Mclust). A basic call to Mclust for this job is as follows:
+
+```{r}
+out = Mclust(swiss,G=1:5,modelNames = "VVV")
+plot(out, what = 'BIC')
+```
+
+> Exercise #1: do it for kmeans (EII model)
+
+```{r}
+out = Mclust(swiss,G=1:10,modelNames = "EII")
+plot(out, what = 'BIC')
+```
+
+Interestingly, we observe that BIC prefers $K=6$ groups for kmeans (EII model) whereas it prefered only $K=2$ groups for a more general GMM (VVV).
+
+> Exercise #2: compare all models and for G=1:10 by not providing a specific model name.
+
+```{r}
+out = Mclust(swiss,G=1:5)
+plot(out, what = 'BIC')
+```
+
+Here, BIC picked the EEE model (Comm-GMM + equal proportions) with $K=3$ groups as the most interesting model for the swiss data.
+
+We can now visualize the results.
+
+```{r}
+plot(out,what = 'classification')
+```
+
+It is also possible to look at the uncertainty (computed from the posterior probabilities $P(Y=k|X,\hat{\theta}$, which is provided in `out$z`). The highlighted points are the ones with the higher risk of misclassification.
+
+```{r}
+plot(out,what="uncertainty")
+```
+
+By the way, it is possible to have a direct look at those posterior probabilities:
+
+```{r}
+round(out$z,15)
+```
+

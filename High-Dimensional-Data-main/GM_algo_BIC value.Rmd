@@ -1,0 +1,39 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#install.packages("mclust")
+library(mclust)
+data(swiss)
+out = Mclust(swiss, G=1:10, modelNames="VVV")
+plot(out, what="BIC")
+```
+
+Interestingly, we observe that BIC prefers $k=3$ groups for kmeans(EEE model) whereas
+
+```{r}
+out = Mclust(swiss, G=1:5)
+plot(out, what="BIC")
+```
+Here, BIC picked the EEE model (Comm-GMM + equal proportions) with $K=3$ groups as the most interesting model for the swiss data
+
+We can now visualize the results
+
+```{r}
+plot(out, what="classification")
+```
+
+Ot is also possible to look at the uncertainty(computed from the posterior probabilities $P(Y=k|X, \hat{\theta}$, which is provided in `out$z`). The highlighted points are the ones with the higher risk of misclassification. 
+method="classification" with covariance ellipse
+method="uncertainty" with the least confident points
+```{r}
+plot(out, what="uncertainty")
+```
+
+By the way,it is possible to have a direct look at those posterior probabilities
+These are classes they are classified as
+```{r}
+round(out$z, 15)
+```
