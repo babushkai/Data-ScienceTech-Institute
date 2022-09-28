@@ -37,7 +37,7 @@ $min_{x \in K} f(x)$ where K is an open set, and f is differentiable. It exactly
 14. Let K be a non-empty closed convex subset of \mathbb{R}^2 that does not contain 0. Let f be a differentiable and convex function on \mathbb{R}^2. We can then deduce that:
 
 15. We consider the following set K, defined by equality constraints:
-$K = {(x, y) \in \mathbb{R}}^2 / x+ y = -1 \frac{1}{2}, x^2 -2y = 0}$
+$K = {(x, y) \in \mathbb{R}^2 / x+ y = -1 \frac{1}{2}, x^2 -2y = 0}$
 
 16.
 
