@@ -2,7 +2,7 @@
 Exam and projects during MSc in Data Science/Artificial Intelligence at Data ScienceTech Institute
 
 ・[Foundation of statistical analysis and machine learning](https://github.com/kwdaisuke/Data-ScienceTech-Institute/blob/main/FSML%20Exam.pdf) \
-・[Continuous Optimization](https://github.com/kwdaisuke/Data-ScienceTech-Institute/blob/main/Optimization.md)
+・[Continuous Optimization](https://github.com/kwdaisuke/Data-ScienceTech-Institute/blob/main/Optimization.md) \
 ・[SQL Converter](https://github.com/kwdaisuke/Data-ScienceTech-Institute/tree/main/SQLConverter) \
 ・[Time Series Analysis](Time-Series.pdf) \
 ・[Semantic Web](SemanticWeb.pdf) \
